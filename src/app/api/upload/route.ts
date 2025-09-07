@@ -1,13 +1,18 @@
-import { put } from '@vercel/blob';
-export const runtime = 'edge'; // or remove this line to use the Node.js runtime
+import { NextRequest } from "next/server";
+import { put } from "@vercel/blob";
 
-export async function POST(req: Request) {
-  const form = await req.formData();
-  const file = form.get('file') as File | null;
-  if (!file) return new Response(JSON.stringify({ error: 'No file' }), { status: 400 });
+export const runtime = "nodejs"; // or "edge" works too
 
+export async function POST(req: NextRequest) {
+  const formData = await req.formData();
+  const file = formData.get("file") as File | null;
+  if (!file) {
+    return new Response("No file uploaded", { status: 400 });
+  }
+
+  // Your current @vercel/blob types only allow "public"
   const blob = await put(`proofs/${Date.now()}-${file.name}`, file, {
-    access: 'private', // change to 'public' if you want a public URL
+    access: "public",
   });
 
   return Response.json({ url: blob.url });
