@@ -20,6 +20,11 @@ import {
   Upload,
   ExternalLink,
   AlertTriangle,
+  Plus,
+  Minus,
+  Trash2,
+  Store,
+  PackagePlus,
 } from "lucide-react";
 
 /** Types */
@@ -36,7 +41,21 @@ type Creator = {
   sampleVideo: string;
   packages: Pkg[];
 };
-type RouteState = { name: "home" | "creator" | "live" | "dashboard"; id: string };
+type Product = {
+  id: string;
+  title: string;
+  price: number;
+  image: string;
+  seller: string;
+  stock: number;
+  description?: string;
+};
+type CartItem = { product: Product; qty: number };
+
+type RouteState = {
+  name: "home" | "creator" | "live" | "dashboard" | "market" | "sell";
+  id: string;
+};
 type BookingRow = {
   id: string;
   creator: string;
@@ -48,7 +67,7 @@ type BookingRow = {
 type BookingState = { creator: Creator; pkg: Pkg };
 type ChatMsg = { id: number; user: string; text: string };
 
-/** Data */
+/** Data: Creators */
 const CREATORS: Creator[] = [
   {
     id: "c1",
@@ -98,6 +117,40 @@ const CREATORS: Creator[] = [
       { id: "p1", title: "Resort LIVE tour (15 min)", price: 6000 },
       { id: "p2", title: "Activity LIVE + Story pack", price: 8500 },
     ],
+  },
+];
+
+/** Data: Seed shop products */
+const SEED_PRODUCTS: Product[] = [
+  {
+    id: "sp1",
+    title: "Island Tee — Coral",
+    price: 899,
+    image:
+      "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?q=80&w=1200&auto=format&fit=crop",
+    seller: "@islandwear",
+    stock: 12,
+    description: "Soft cotton T-shirt with island vibes.",
+  },
+  {
+    id: "sp2",
+    title: "Vanilla Rum (Gift)",
+    price: 1299,
+    image:
+      "https://images.unsplash.com/photo-1541542684-4a6d00b7feb1?q=80&w=1200&auto=format&fit=crop",
+    seller: "@creolegifts",
+    stock: 6,
+    description: "Local infused vanilla rum — perfect gift.",
+  },
+  {
+    id: "sp3",
+    title: "Beach Hat",
+    price: 499,
+    image:
+      "https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb?q=80&w=1200&auto=format&fit=crop",
+    seller: "@sun&sea",
+    stock: 20,
+    description: "Woven hat for sunny LIVE days.",
   },
 ];
 
@@ -156,9 +209,52 @@ export default function App() {
   const [proofFileName, setProofFileName] = useState<string>("");
   const [externalLink, setExternalLink] = useState<string>("");
   const [recent, setRecent] = useState<BookingRow[]>([]);
-
   const results = useMemo(() => filterCreators(q, niche, minFollowers), [q, niche, minFollowers]);
 
+  /** Marketplace state */
+  const [products, setProducts] = useState<Product[]>(SEED_PRODUCTS);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
+
+  const cartCount = useMemo(() => cart.reduce((acc, c) => acc + c.qty, 0), [cart]);
+  const cartSum = useMemo(
+    () => cart.reduce((acc, c) => acc + c.qty * c.product.price, 0),
+    [cart]
+  );
+
+  const addToCart = (p: Product) => {
+    setCart((prev) => {
+      const i = prev.findIndex((ci) => ci.product.id === p.id);
+      if (i >= 0) {
+        const next = [...prev];
+        next[i] = { ...next[i], qty: Math.min(next[i].qty + 1, p.stock) };
+        return next;
+      }
+      return [...prev, { product: p, qty: 1 }];
+    });
+  };
+  const updateQty = (id: string, qty: number) => {
+    setCart((prev) =>
+      prev
+        .map((ci) =>
+          ci.product.id === id ? { ...ci, qty: Math.min(Math.max(qty, 1), ci.product.stock) } : ci
+        )
+        .filter((ci) => ci.qty > 0)
+    );
+  };
+  const removeFromCart = (id: string) => setCart((prev) => prev.filter((ci) => ci.product.id !== id));
+  const clearCart = () => setCart([]);
+
+  /** Seller adds product */
+  const saveProduct = (data: Omit<Product, "id" | "seller"> & { seller?: string }) => {
+    const id = `p${Date.now()}`;
+    const seller = data.seller ?? "@you";
+    const prod: Product = { id, seller, title: data.title, price: data.price, image: data.image, stock: data.stock, description: data.description };
+    setProducts((prev) => [prod, ...prev]);
+    setRoute({ name: "market", id: "" });
+  };
+
+  /** External pay link for MyT demo */
   useEffect(() => {
     if (paymentFlow === "myt" && booking) {
       const id = `${booking.creator.id}-${booking.pkg.id}-${Date.now()}`;
@@ -188,7 +284,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full bg-[#0e0f12] text-white">
-      <TopBar canGoBack={route.name !== "home"} onBack={() => setRoute({ name: "home", id: "" })} />
+      <TopBar
+        canGoBack={route.name !== "home"}
+        onBack={() => setRoute({ name: "home", id: "" })}
+        onGoMarket={() => setRoute({ name: "market", id: "" })}
+        onGoSell={() => setRoute({ name: "sell", id: "" })}
+        cartCount={cartCount}
+        onOpenCart={() => setCartOpen(true)}
+      />
 
       {route.name === "home" && (
         <HomeView
@@ -222,6 +325,18 @@ export default function App() {
 
       {route.name === "dashboard" && <Dashboard onBack={() => setRoute({ name: "home", id: "" })} extra={recent} />}
 
+      {route.name === "market" && (
+        <MarketPage
+          products={products}
+          onAdd={(p) => addToCart(p)}
+        />
+      )}
+
+      {route.name === "sell" && (
+        <SellPage onBack={() => setRoute({ name: "home", id: "" })} onSave={saveProduct} />
+      )}
+
+      {/* Floating demo button */}
       <div className="fixed bottom-5 right-5 flex flex-col gap-3">
         <button
           onClick={() => setRoute({ name: "dashboard", id: "" })}
@@ -231,6 +346,7 @@ export default function App() {
         </button>
       </div>
 
+      {/* Checkout modal (creator bookings) */}
       {checkoutOpen && booking && (
         <CheckoutModal
           booking={booking}
@@ -244,12 +360,43 @@ export default function App() {
           onPending={() => finalizeBooking("Pending")}
         />
       )}
+
+      {/* Cart drawer (shop) */}
+      {cartOpen && (
+        <CartDrawer
+          items={cart}
+          total={cartSum}
+          onClose={() => setCartOpen(false)}
+          onUpdateQty={updateQty}
+          onRemove={removeFromCart}
+          onClear={clearCart}
+          onCheckout={() => {
+            alert(`Checkout demo — total ${formatCurrency(cartSum)}`);
+            clearCart();
+            setCartOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 /** Views & Components */
-function TopBar({ canGoBack, onBack }: { canGoBack?: boolean; onBack: () => void }) {
+function TopBar({
+  canGoBack,
+  onBack,
+  onGoMarket,
+  onGoSell,
+  cartCount,
+  onOpenCart,
+}: {
+  canGoBack?: boolean;
+  onBack: () => void;
+  onGoMarket: () => void;
+  onGoSell: () => void;
+  cartCount: number;
+  onOpenCart: () => void;
+}) {
   return (
     <div className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#0e0f12]/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
@@ -266,7 +413,26 @@ function TopBar({ canGoBack, onBack }: { canGoBack?: boolean; onBack: () => void
             </span>
           </div>
         </div>
+
         <div className="flex items-center gap-2">
+          <button onClick={onGoMarket} className="inline-flex items-center rounded-md px-3 py-2 text-sm hover:bg-white/10">
+            <Store className="mr-2 h-4 w-4" /> Market
+          </button>
+          <button onClick={onGoSell} className="inline-flex items-center rounded-md px-3 py-2 text-sm hover:bg-white/10">
+            <PackagePlus className="mr-2 h-4 w-4" /> Sell
+          </button>
+          <button
+            onClick={onOpenCart}
+            className="relative inline-flex items-center rounded-md px-3 py-2 text-sm hover:bg-white/10"
+            aria-label="Open cart"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            {cartCount > 0 && (
+              <span className="absolute -right-1 -top-1 rounded-full bg-[#FE2C55] px-1.5 text-[10px] font-bold text-black">
+                {cartCount}
+              </span>
+            )}
+          </button>
           <button className="rounded-md px-3 py-2 text-sm hover:bg-white/10">
             <MessageCircle className="mr-2 inline h-4 w-4" /> Support
           </button>
@@ -847,3 +1013,293 @@ function Dashboard({ onBack, extra = [] as BookingRow[] }: { onBack: () => void;
   );
 }
 
+/** New: Market (shop) */
+function MarketPage({
+  products,
+  onAdd,
+}: {
+  products: Product[];
+  onAdd: (p: Product) => void;
+}) {
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-bold inline-flex items-center gap-2">
+          <Store className="h-5 w-5" /> Market
+        </h2>
+        <p className="text-sm text-white/70">Sell or buy items alongside LIVE bookings.</p>
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {products.map((p) => (
+          <div key={p.id} className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+            <div className="relative h-48 w-full">
+              <Image
+                src={p.image}
+                alt={p.title}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="object-cover"
+                priority={false}
+              />
+            </div>
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold">{p.title}</div>
+                <div className="text-emerald-300 font-semibold">{formatCurrency(p.price)}</div>
+              </div>
+              <div className="mt-1 text-sm text-white/70">Seller: {p.seller} • Stock: {p.stock}</div>
+              {p.description && <div className="mt-1 text-sm text-white/60 line-clamp-2">{p.description}</div>}
+              <div className="mt-3">
+                <button
+                  onClick={() => onAdd(p)}
+                  className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90"
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" /> Add to cart
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {products.length === 0 && (
+          <div className="col-span-full rounded-xl border border-white/10 bg-black/30 p-6 text-center text-white/70">
+            No products yet. Be the first to add one in <b>Sell</b>!
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** New: Sell form (upload to /api/upload) */
+function SellPage({
+  onBack,
+  onSave,
+}: {
+  onBack?: () => void;
+  onSave: (p: Omit<Product, "id" | "seller"> & { seller?: string }) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [price, setPrice] = useState<number>(0);
+  const [stock, setStock] = useState<number>(1);
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [imgUrl, setImgUrl] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string>("");
+
+  const upload = async (): Promise<string> => {
+    if (!file) throw new Error("Please choose an image.");
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    if (!res.ok) throw new Error("Upload failed");
+    const data = (await res.json()) as { url: string };
+    return data.url;
+  };
+
+  const submit = async () => {
+    setErr("");
+    if (!title.trim() || price <= 0 || stock <= 0) {
+      setErr("Fill title, price (>0), and stock (>0).");
+      return;
+    }
+    try {
+      setSaving(true);
+      const url = imgUrl || (file ? await upload() : "");
+      if (!url) throw new Error("Please upload/select an image.");
+      onSave({ title, price, stock, image: url, description, seller: "@you" });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-bold inline-flex items-center gap-2">
+          <PackagePlus className="h-5 w-5" /> Add a product
+        </h2>
+        {onBack && (
+          <button onClick={onBack} className="rounded-md px-3 py-2 text-sm hover:bg-white/10">
+            <ArrowLeft className="mr-2 inline h-4 w-4" /> Back
+          </button>
+        )}
+      </div>
+
+      {err && (
+        <div className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          {err}
+        </div>
+      )}
+
+      <div className="grid gap-4">
+        <div>
+          <label className="text-sm text-white/80">Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm"
+            placeholder="e.g., Island Tee — Coral"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm text-white/80">Price (MUR)</label>
+            <input
+              type="number"
+              min={0}
+              value={price}
+              onChange={(e) => setPrice(Number(e.target.value || 0))}
+              className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-white/80">Stock</label>
+            <input
+              type="number"
+              min={1}
+              value={stock}
+              onChange={(e) => setStock(Number(e.target.value || 1))}
+              className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm text-white/80">Description (optional)</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className="mt-1 w-full rounded-md border border-white/10 bg-white/5 p-2 text-sm"
+            placeholder="Short details about the product..."
+          />
+        </div>
+
+        <div className="grid gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="text-sm font-semibold">Product image</div>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+            className="block w-full rounded-md border border-white/10 bg-[#0e0f12] px-3 py-2 text-sm"
+          />
+          <div className="text-xs text-white/60">Or paste an existing image URL:</div>
+          <input
+            value={imgUrl}
+            onChange={(e) => setImgUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full rounded-md border border-white/10 bg-[#0e0f12] px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save product"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** New: Cart drawer */
+function CartDrawer({
+  items,
+  total,
+  onClose,
+  onUpdateQty,
+  onRemove,
+  onClear,
+  onCheckout,
+}: {
+  items: CartItem[];
+  total: number;
+  onClose: () => void;
+  onUpdateQty: (id: string, qty: number) => void;
+  onRemove: (id: string) => void;
+  onClear: () => void;
+  onCheckout: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute right-0 top-0 h-full w-full max-w-md overflow-auto border-l border-white/10 bg-[#0e0f12] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-lg font-bold inline-flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5" /> Your Cart
+          </div>
+          <button onClick={onClose} className="rounded-md px-3 py-2 text-sm hover:bg-white/10">Close</button>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-center text-white/70">
+            Cart is empty.
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              {items.map(({ product, qty }) => (
+                <div key={product.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md">
+                    <Image src={product.image} alt={product.title} fill sizes="56px" className="object-cover" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{product.title}</div>
+                    <div className="text-sm text-white/70">{formatCurrency(product.price)}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      aria-label="Decrease"
+                      onClick={() => onUpdateQty(product.id, qty - 1)}
+                      className="rounded-md border border-white/20 bg-white/5 p-1 hover:bg-white/10"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <div className="w-8 text-center text-sm">{qty}</div>
+                    <button
+                      aria-label="Increase"
+                      onClick={() => onUpdateQty(product.id, qty + 1)}
+                      className="rounded-md border border-white/20 bg-white/5 p-1 hover:bg-white/10"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                    <button
+                      aria-label="Remove"
+                      onClick={() => onRemove(product.id)}
+                      className="ml-2 rounded-md border border-white/20 bg-white/5 p-1 hover:bg-white/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-white/70">Subtotal</div>
+                <div className="font-semibold">{formatCurrency(total)}</div>
+              </div>
+              <div className="mt-1 text-xs text-white/60">Taxes/shipping not included (demo).</div>
+              <div className="mt-3 flex justify-between gap-2">
+                <button onClick={onClear} className="rounded-md px-3 py-2 text-sm hover:bg-white/10">Clear</button>
+                <button onClick={onCheckout} className="rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium hover:bg-emerald-600">
+                  Checkout
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
