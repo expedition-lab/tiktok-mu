@@ -59,3 +59,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 >>>>>>> 929c19a4c7a7af47cd9aaec64379675864b6533f
+
+# local backups
+*.bak
