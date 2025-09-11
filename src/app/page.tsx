@@ -58,8 +58,7 @@ const CREATORS: Creator[] = [
     engagement: 7.1,
     niche: ["Fashion", "Beauty"],
     city: "Port Louis",
-    thumb:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=1200&auto=format&fit=crop",
+    thumb: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=1200&auto=format&fit=crop",
     sampleVideo: "https://www.youtube.com/embed/ysz5S6PUM-U?si=demo1",
     packages: [
       { id: "p1", title: "15-min LIVE shoutout", price: 4500 },
@@ -75,8 +74,7 @@ const CREATORS: Creator[] = [
     engagement: 5.8,
     niche: ["Food", "Lifestyle"],
     city: "Curepipe",
-    thumb:
-      "https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?q=80&w=1200&auto=format&fit=crop",
+    thumb: "https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?q=80&w=1200&auto=format&fit=crop",
     sampleVideo: "https://www.youtube.com/embed/aqz-KE-bpKQ?si=demo2",
     packages: [
       { id: "p1", title: "Restaurant LIVE promo (20 min)", price: 5200 },
@@ -91,8 +89,7 @@ const CREATORS: Creator[] = [
     engagement: 6.2,
     niche: ["Travel", "Adventure"],
     city: "Flic-en-Flac",
-    thumb:
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
+    thumb: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
     sampleVideo: "https://www.youtube.com/embed/ScMzIvxBSi4?si=demo3",
     packages: [
       { id: "p1", title: "Resort LIVE tour (15 min)", price: 6000 },
@@ -112,8 +109,7 @@ const GIFTS = [
   { id: "castle", name: "Castle", coins: 20000 },
 ];
 const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
-const formatCurrency = (n: number) =>
-  new Intl.NumberFormat("en-MU", { style: "currency", currency: "MUR" }).format(n);
+const formatCurrency = (n: number) => new Intl.NumberFormat("en-MU", { style: "currency", currency: "MUR" }).format(n);
 const formatFollowers = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 function filterCreators(q: string, niche: string, minFollowers: number): Creator[] {
@@ -180,8 +176,7 @@ export default function App() {
     setCheckoutOpen(false);
     setPaymentFlow("idle");
     setProofFileName("");
-    // No alert to keep ESLint happy; just log
-    console.log(`Booking ${status.toLowerCase()}`);
+    alert(`Booking ${status.toLowerCase()}!`);
   };
 
   const currentCreator: Creator | null =
@@ -189,7 +184,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full bg-[#0e0f12] text-white">
-      <TopBar canGoBack={route.name !== "home"} onBack={() => setRoute({ name: "home", id: "" })} />
+      <TopBar
+        canGoBack={route.name !== "home"}
+        onBack={() => setRoute({ name: "home", id: "" })}
+      />
 
       {route.name === "home" && (
         <HomeView
@@ -218,10 +216,15 @@ export default function App() {
       )}
 
       {route.name === "live" && currentCreator && (
-        <LivePage creator={currentCreator} onBack={() => setRoute({ name: "creator", id: currentCreator.id })} />
+        <LivePage
+          creator={currentCreator}
+          onBack={() => setRoute({ name: "creator", id: currentCreator.id })}
+        />
       )}
 
-      {route.name === "dashboard" && <Dashboard onBack={() => setRoute({ name: "home", id: "" })} extra={recent} />}
+      {route.name === "dashboard" && (
+        <Dashboard onBack={() => setRoute({ name: "home", id: "" })} extra={recent} />
+      )}
 
       <div className="fixed bottom-5 right-5 flex flex-col gap-3">
         <button
@@ -256,7 +259,11 @@ function TopBar({ canGoBack, onBack }: { canGoBack?: boolean; onBack: () => void
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           {canGoBack && (
-            <button aria-label="Back" onClick={onBack} className="rounded-md p-2 text-white hover:bg-white/10">
+            <button
+              aria-label="Back"
+              onClick={onBack}
+              className="rounded-md p-2 text-white hover:bg-white/10"
+            >
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
@@ -268,6 +275,20 @@ function TopBar({ canGoBack, onBack }: { canGoBack?: boolean; onBack: () => void
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* TikTok auth buttons */}
+          <a
+            href="/api/auth/tiktok/start"
+            className="rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90"
+          >
+            Continue with TikTok
+          </a>
+          <a
+            href="/api/auth/logout"
+            className="rounded-md px-3 py-2 text-sm hover:bg-white/10"
+          >
+            Logout
+          </a>
+
           <button className="rounded-md px-3 py-2 text-sm hover:bg-white/10">
             <MessageCircle className="mr-2 inline h-4 w-4" /> Support
           </button>
