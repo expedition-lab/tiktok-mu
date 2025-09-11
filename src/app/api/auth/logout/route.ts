@@ -1,15 +1,15 @@
-// src/app/api/auth/logout/route.ts
-import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
+/**
+ * Logs the user out by clearing auth cookies, then redirects to SITE_URL.
+ * In Next 15, `cookies()` is async (type: Promise<ReadonlyRequestCookies>),
+ * so we `await` it before calling `.delete(...)`.
+ */
 export async function GET() {
+  const store = await cookies();
+  store.delete("tk_user");
+  store.delete("tk_token");
+
   const site = process.env.SITE_URL || "http://localhost:3000";
-
-  // Create a redirect response and mutate cookies on *the response*
-  const res = NextResponse.redirect(site, { status: 302 });
-
-  // Delete cookies set during login
-  res.cookies.delete("tk_user");
-  res.cookies.delete("tk_token");
-
-  return res;
+  return Response.redirect(site, 302);
 }
