@@ -39,7 +39,11 @@ export async function GET() {
 
   const authUrl = `https://www.tiktok.com/v2/auth/authorize?${params.toString()}`;
   const res = NextResponse.redirect(authUrl, 302);
-  res.cookies.set("t_state", state, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 600 });
-  res.cookies.set("t_verifier", codeVerifier, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 600 });
+
+  // Write cookies to the response (NOT via cookies())
+  const opts = { httpOnly: true as const, secure: true, sameSite: "lax" as const, path: "/", maxAge: 600 };
+  res.cookies.set("t_state", state, opts);
+  res.cookies.set("t_verifier", codeVerifier, opts);
+
   return res;
 }

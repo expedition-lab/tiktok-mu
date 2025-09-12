@@ -9,54 +9,66 @@ type TokenResp = {
 };
 
 export async function GET(req: Request) {
-  const site = process.env.SITE_URL || "http://localhost:3000";
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const incomingState = url.searchParams.get("state");
-  const jar = await cookies();
-  const savedState = jar.get("t_state")?.value;
-  const verifier = jar.get("t_verifier")?.value;
+  const state = url.searchParams.get("state");
 
-  if (!code || !incomingState || !verifier || incomingState !== savedState) {
-    return NextResponse.redirect(`${site}?auth=error`);
+  // READ ONLY: use await cookies()
+  const c = await cookies();
+  const expectedState = c.get("t_state")?.value;
+  const verifier = c.get("t_verifier")?.value;
+
+  const site = process.env.SITE_URL || "http://localhost:3000";
+
+  // If anything is off, redirect and clear temp cookies on the response
+  if (!code || !state || !expectedState || state !== expectedState || !verifier) {
+    const fail = NextResponse.redirect(`${site}?auth=failed`, 302);
+    fail.cookies.set("t_state", "", { maxAge: 0, path: "/" });
+    fail.cookies.set("t_verifier", "", { maxAge: 0, path: "/" });
+    return fail;
   }
 
-  const body = new URLSearchParams({
-    client_key: process.env.TIKTOK_CLIENT_KEY!,
-    client_secret: process.env.TIKTOK_CLIENT_SECRET!,
-    code,
-    grant_type: "authorization_code",
-    code_verifier: verifier,
-    redirect_uri: process.env.TIKTOK_REDIRECT_URI!,
-  });
+  const client_key = process.env.TIKTOK_CLIENT_KEY!;
+  const client_secret = process.env.TIKTOK_CLIENT_SECRET!;
+  const redirect_uri = process.env.TIKTOK_REDIRECT_URI!;
 
-  const tRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-
-  const tJson = (await tRes.json()) as TokenResp;
-
-  if (!tJson.access_token) {
-    return NextResponse.redirect(`${site}?auth=error`);
-  }
-
-  // (Optional) get user info
-  let openId: string | undefined = undefined;
   try {
-    const uRes = await fetch(
-      "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url",
-      { headers: { Authorization: `Bearer ${tJson.access_token}` } }
-    );
-    const uJson = await uRes.json();
-    openId = uJson?.data?.user?.open_id;
-  } catch {}
+    const resp = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      body: new URLSearchParams({
+        client_key,
+        client_secret,
+        code,
+        grant_type: "authorization_code",
+        code_verifier: verifier,
+        redirect_uri,
+      }),
+    });
 
-  const res = NextResponse.redirect(`${site}?auth=ok`, 302);
-  res.cookies.set("tk_token", tJson.access_token, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
-  if (openId) res.cookies.set("tk_user", openId, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
-  res.cookies.delete("t_state");
-  res.cookies.delete("t_verifier");
-  return res;
+    const data = (await resp.json()) as TokenResp;
+
+    // Build the final response first so we can mutate cookies on it
+    const res = NextResponse.redirect(site, 302);
+
+    // Always clear temp cookies
+    res.cookies.set("t_state", "", { maxAge: 0, path: "/" });
+    res.cookies.set("t_verifier", "", { maxAge: 0, path: "/" });
+
+    if (!data.access_token || !data.open_id) {
+      return NextResponse.redirect(`${site}?auth=failed`, 302);
+    }
+
+    // Persist short-lived demo cookies
+    const opts = { httpOnly: true as const, sameSite: "lax" as const, path: "/", maxAge: 60 * 60 * 24 * 7 };
+    res.cookies.set("tk_user", data.open_id, opts);
+    res.cookies.set("tk_token", data.access_token, opts);
+
+    return res;
+  } catch {
+    const fail = NextResponse.redirect(`${site}?auth=failed`, 302);
+    fail.cookies.set("t_state", "", { maxAge: 0, path: "/" });
+    fail.cookies.set("t_verifier", "", { maxAge: 0, path: "/" });
+    return fail;
+  }
 }
