@@ -140,6 +140,42 @@ function luhnCheck(card: string): boolean {
   return sum % 10 === 0;
 }
 
+/** Auth UI (added) */
+function AuthButtons() {
+  const [user, setUser] = React.useState<null | { display_name?: string; avatar_url?: string }>(null);
+
+  React.useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.ok ? r.json() : { user: null })
+      .then((d) => setUser(d.user || null))
+      .catch(() => setUser(null));
+  }, []);
+
+  if (user) {
+    return (
+      <div className="flex items-center gap-2">
+        {user.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.avatar_url} alt="" className="h-6 w-6 rounded-full" />
+        ) : null}
+        <span className="text-sm">{user.display_name || "TikTok User"}</span>
+        <a href="/api/auth/logout" className="rounded-md px-3 py-2 text-sm hover:bg-white/10">
+          Logout
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href="/api/auth/tiktok/start"
+      className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90"
+    >
+      Continue with TikTok
+    </a>
+  );
+}
+
 /** App */
 export default function App() {
   const [route, setRoute] = useState<RouteState>({ name: "home", id: "" });
@@ -275,20 +311,7 @@ function TopBar({ canGoBack, onBack }: { canGoBack?: boolean; onBack: () => void
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* TikTok auth buttons */}
-          <a
-            href="/api/auth/tiktok/start"
-            className="rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90"
-          >
-            Continue with TikTok
-          </a>
-          <a
-            href="/api/auth/logout"
-            className="rounded-md px-3 py-2 text-sm hover:bg-white/10"
-          >
-            Logout
-          </a>
-
+          <AuthButtons />
           <button className="rounded-md px-3 py-2 text-sm hover:bg-white/10">
             <MessageCircle className="mr-2 inline h-4 w-4" /> Support
           </button>
@@ -600,271 +623,3 @@ function LivePage({ creator, onBack }: { creator: Creator; onBack: () => void })
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="mb-2 flex items-center justify-between text-sm font-semibold">
-              <span>Earnings Tracker</span>
-              <span className="text-white/60">demo</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-lg border border-white/10 bg-black/20 p-2">
-                <div className="text-xs text-white/60">Coins</div>
-                <div className="text-lg font-bold">{coins.toLocaleString()}</div>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/20 p-2">
-                <div className="text-xs text-white/60">Approx. MUR</div>
-                <div className="text-lg font-bold text-emerald-400">{formatCurrency(coins * COIN_TO_MUR)}</div>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <button onClick={() => setCoins((c) => c + 100)} className="rounded-md bg-[#FE2C55] px-3 py-2 text-sm font-medium hover:bg-[#d81e45]">
-                <Gift className="mr-2 inline h-4 w-4" /> +100 coins
-              </button>
-              <button onClick={() => setCoins((c) => c + 1000)} className="rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
-                +1000
-              </button>
-            </div>
-            <div className="mt-2 text-xs text-white/60">Tap to simulate fans sending gifts during LIVE.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CheckoutModal({
-  booking,
-  paymentFlow,
-  setPaymentFlow,
-  proofFileName,
-  setProofFileName,
-  externalLink,
-  onClose,
-  onConfirm,
-  onPending,
-}: {
-  booking: BookingState;
-  paymentFlow: "idle" | "card" | "juice" | "myt";
-  setPaymentFlow: (v: "idle" | "card" | "juice" | "myt") => void;
-  proofFileName: string;
-  setProofFileName: (v: string) => void;
-  externalLink: string;
-  onClose: () => void;
-  onConfirm: () => void;
-  onPending: () => void;
-}) {
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
-  const [expiry, setExpiry] = useState("12/29");
-  const [cvc, setCvc] = useState("123");
-  const [processing, setProcessing] = useState(false);
-  const [cardError, setCardError] = useState<string>("");
-
-  const maskedNumber = cardNumber.split("").filter((ch) => "0123456789 ".includes(ch)).join("");
-  const monthOk = expiry.length === 5 && expiry[2] === "/" && Number(expiry.slice(0, 2)) >= 1 && Number(expiry.slice(0, 2)) <= 12;
-  const cvcOk = (cvc.length === 3 || cvc.length === 4) && Array.from(cvc).every((ch) => ch >= "0" && ch <= "9");
-  const canSubmit = cardName.trim().length >= 2 && luhnCheck(maskedNumber) && monthOk && cvcOk;
-
-  const submitCard = () => {
-    setCardError("");
-    if (!canSubmit) {
-      setCardError("Please check name, card number (Luhn), expiry (MM/YY), and CVC.");
-      return;
-    }
-    setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
-      const digits = maskedNumber.split(" ").join("");
-      const forcedDecline = digits.endsWith("0002");
-      const randomDecline = Math.random() < 0.25;
-      if (forcedDecline || randomDecline) {
-        setCardError("Payment failed: your bank declined the transaction. Try again or switch to Juice.");
-      } else {
-        onConfirm();
-      }
-    }, 800);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div className="max-h-[90vh] w-[90vw] max-w-xl overflow-auto rounded-xl border border-white/10 bg-[#0e0f12] p-4" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center gap-2 text-lg font-bold">
-          <ShoppingCart className="h-5 w-5" /> Checkout
-        </div>
-        <p className="mb-3 text-sm text-white/60">Demo checkout • 15% commission included • Choose a payment method below</p>
-
-        <div className="rounded-xl bg-white/5 p-3">
-          <div className="font-medium">
-            {booking.creator.name} {booking.creator.handle}
-          </div>
-          <div className="text-sm text-white/70">{booking.pkg.title}</div>
-          <div className="text-sm text-white/70">Base price: {formatCurrency(booking.pkg.price)}</div>
-          <div className="text-sm text-white/70">Our commission (15%): {formatCurrency(Math.round(booking.pkg.price * COMMISSION_RATE))}</div>
-          <div className="mt-1 font-semibold">Total: {formatCurrency(computeTotal(booking.pkg.price))}</div>
-        </div>
-
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="text-sm text-white/80">Preferred date</label>
-            <input type="date" className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" />
-          </div>
-          <div>
-            <label className="text-sm text-white/80">Preferred time</label>
-            <input type="time" className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" />
-          </div>
-        </div>
-        <div className="mt-3">
-          <label className="text-sm text-white/80">Campaign brief</label>
-          <textarea rows={4} className="mt-1 w-full rounded-md border border-white/10 bg-white/5 p-2 text-sm" placeholder="Key talking points, links, discount codes..." />
-        </div>
-
-        {paymentFlow === "idle" && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <button onClick={() => setPaymentFlow("card")} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90">
-              <CreditCard className="mr-2 inline h-4 w-4" /> Pay with Card
-            </button>
-            <button onClick={() => setPaymentFlow("juice")} className="rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
-              <Upload className="mr-2 inline h-4 w-4" /> Pay via Juice (proof)
-            </button>
-            <button onClick={() => setPaymentFlow("myt")} className="rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
-              <ExternalLink className="mr-2 inline h-4 w-4" /> MyT Money link
-            </button>
-          </div>
-        )}
-
-        {paymentFlow === "card" && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
-            <div className="mb-2 text-sm font-semibold">Card payment (mock)</div>
-            {cardError && (
-              <div className="mb-2 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-200">
-                <AlertTriangle className="mt-0.5 h-4 w-4" />
-                <div>
-                  {cardError}
-                  <div className="mt-1 text-xs text-red-200/80">Tip: Use <code>4242 4242 4242 4242</code> to succeed, or <code>4000 0000 0000 0002</code> to simulate a decline.</div>
-                </div>
-              </div>
-            )}
-            <div className="grid gap-2">
-              <input value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Cardholder name" className={cx("w-full rounded-md border px-3 py-2 text-sm", cardName.trim().length >= 2 ? "border-white/10 bg-white/5" : "border-red-500/40 bg-red-500/5")} />
-              <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="Card number" className={cx("w-full rounded-md border px-3 py-2 text-sm", luhnCheck(maskedNumber) ? "border-white/10 bg-white/5" : "border-yellow-500/40 bg-yellow-500/5")} />
-              <div className="grid grid-cols-2 gap-2">
-                <input value={expiry} onChange={(e) => setExpiry(e.target.value)} placeholder="MM/YY" className={cx("rounded-md border px-3 py-2 text-sm", monthOk ? "border-white/10 bg-white/5" : "border-yellow-500/40 bg-yellow-500/5")} />
-                <input value={cvc} onChange={(e) => setCvc(e.target.value)} placeholder="CVC" className={cx("rounded-md border px-3 py-2 text-sm", cvcOk ? "border-white/10 bg-white/5" : "border-yellow-500/40 bg-yellow-500/5")} />
-              </div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <button onClick={() => setPaymentFlow("idle")} className="rounded-md px-3 py-2 text-sm hover:bg-white/10">Back</button>
-                <div className="flex items-center gap-2">
-                  {cardError && (
-                    <button onClick={() => submitCard()} disabled={processing} className="rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-60">
-                      Retry payment
-                    </button>
-                  )}
-                  <button onClick={() => setPaymentFlow("juice")} className="rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
-                    Switch to Juice
-                  </button>
-                  <button onClick={() => submitCard()} disabled={!canSubmit || processing} className="rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
-                    {processing ? "Processing…" : `Pay ${formatCurrency(computeTotal(booking.pkg.price))}`}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {paymentFlow === "juice" && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
-            <div className="mb-2 text-sm font-semibold">Pay via MCB Juice / MyT — upload proof</div>
-            <ol className="mb-2 list-decimal pl-5 text-sm text-white/80">
-              <li>Send {formatCurrency(computeTotal(booking.pkg.price))} to <b>+230 5 123 4567</b> (Demo).</li>
-              <li>Upload the screenshot/receipt below.</li>
-            </ol>
-            <input type="file" onChange={(e) => setProofFileName(e.target.files && e.target.files[0] ? e.target.files[0].name : "")} className="block w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm" />
-            {proofFileName && <div className="mt-1 text-xs text-white/60">Selected: {proofFileName}</div>}
-            <div className="mt-2 flex justify-between">
-              <button onClick={() => setPaymentFlow("idle")} className="rounded-md px-3 py-2 text-sm hover:bg-white/10">Back</button>
-              <button onClick={onPending} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90">
-                Submit proof &amp; mark Pending
-              </button>
-            </div>
-          </div>
-        )}
-
-        {paymentFlow === "myt" && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
-            <div className="mb-2 text-sm font-semibold">MyT Money — external payment link</div>
-            <p className="text-sm text-white/70">Open the link below to complete payment, then come back and click <b>I&apos;ve paid</b>.</p>
-            <div className="mt-2 rounded-lg border border-white/10 bg-black/40 p-3 text-sm">
-              <div className="mb-2">Amount: <b>{formatCurrency(computeTotal(booking.pkg.price))}</b></div>
-              <a href={externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90">
-                <ExternalLink className="mr-2 h-4 w-4" /> Open payment link
-              </a>
-              <div className="mt-2 text-xs text-white/60 break-all">Demo link: {externalLink}</div>
-            </div>
-            <div className="mt-2 flex justify-between">
-              <button onClick={() => setPaymentFlow("idle")} className="rounded-md px-3 py-2 text-sm hover:bg-white/10">Back</button>
-              <button onClick={onConfirm} className="rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium hover:bg-emerald-600">
-                I&apos;ve paid — Confirm
-              </button>
-            </div>
-          </div>
-        )}
-
-        {paymentFlow === "idle" && (
-          <div className="mt-4 flex justify-end gap-2">
-            <button onClick={onClose} className="rounded-md px-3 py-2 text-sm hover:bg-white/10">Cancel</button>
-            <button onClick={onConfirm} className="rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600">
-              Confirm (Demo)
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Dashboard({ onBack, extra = [] as BookingRow[] }: { onBack: () => void; extra?: BookingRow[] }) {
-  const mockBookings: BookingRow[] = [
-    { id: "b1", creator: "@aisha.mu", title: "15-min LIVE shoutout", date: "2025-09-08 19:00", total: 5175, status: "Confirmed" },
-    { id: "b2", creator: "@sam_beach", title: "Resort LIVE tour (15 min)", date: "2025-09-10 14:30", total: 6900, status: "Pending" },
-  ];
-  const rows = [...extra, ...mockBookings];
-
-  return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-bold">Brand Dashboard (Demo)</h2>
-        <button onClick={onBack} className="rounded-md px-3 py-2 text-sm hover:bg-white/10">
-          <ArrowLeft className="mr-2 inline h-4 w-4" /> Back
-        </button>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
-          <div className="text-sm text-white/70">Confirmed</div>
-          <div className="text-2xl font-bold">{rows.filter((r) => r.status === "Confirmed").length}</div>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
-          <div className="text-sm text-white/70">Spend</div>
-          <div className="text-2xl font-bold">{formatCurrency(rows.reduce((a, b) => a + (b.total || 0), 0))}</div>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
-          <div className="text-sm text-white/70">Creators</div>
-          <div className="text-2xl font-bold">{new Set(rows.map((r) => r.creator)).size}</div>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-        <div className="mb-2 text-sm text-white/70">Upcoming &amp; recent</div>
-        <div className="space-y-2">
-          {rows.map((b) => (
-            <div key={b.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 p-3">
-              <div>
-                <div className="font-medium">{b.creator} • {b.title}</div>
-                <div className="text-sm text-white/70">{b.date} • Total {formatCurrency(b.total)} • {b.status}</div>
-              </div>
-              <Badge className={cx("", b.status === "Confirmed" ? "text-emerald-300" : "text-yellow-300")}>{b.status}</Badge>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
