@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-export async function GET() {
-  // In Next 15, cookies() is read-only and should be awaited
-  const c = await cookies();
-  const raw = c.get("session")?.value;
+// Use Node so Buffer is available (simplest + reliable)
+export const runtime = "nodejs";
+// Avoid caching responses for session state
+export const dynamic = "force-dynamic";
+
+export function GET() {
+  const raw = cookies().get("session")?.value;
 
   if (!raw) {
     return NextResponse.json({ user: null });
   }
 
   try {
-    const decoded = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
-    return NextResponse.json({ user: decoded });
+    // Cookie is base64-encoded JSON
+    const jsonStr = Buffer.from(raw, "base64").toString("utf8");
+    const user = JSON.parse(jsonStr);
+    return NextResponse.json({ user });
   } catch {
     // Bad/expired cookie -> treat as signed out
     return NextResponse.json({ user: null }, { status: 400 });
