@@ -1,0 +1,265 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+
+type Creator = {
+  id: number;
+  name: string;
+  avatar: string;
+  location: string;
+  followers: number;
+  engagement: number;
+  views: number;
+  price: number;
+  category: 'lifestyle'|'fashion'|'food'|'tech'|'fitness';
+  badges?: string[];
+};
+
+const CREATORS: Creator[] = [
+  { id:1, name:"Maya Lifestyle", avatar:"ML", location:"Port Louis", followers:125000, engagement:7.1, views:15000, price:5000, category:"lifestyle", badges:['Top Rated','Fast Responder'] },
+  { id:2, name:"Tech Curepipe", avatar:"TC", location:"Curepipe", followers:89000, engagement:5.8, views:12000, price:3500, category:"tech", badges:['Trending','New Talent'] },
+  { id:3, name:"Beach Flic", avatar:"BF", location:"Flic-en-Flac", followers:156000, engagement:6.2, views:18000, price:7500, category:"lifestyle", badges:['Island Pro','Top Rated'] },
+  { id:4, name:"Fashion Forward", avatar:"FF", location:"Grand Baie", followers:203000, engagement:8.4, views:25000, price:12000, category:"fashion" },
+  { id:5, name:"Foodie Mauritius", avatar:"FM", location:"Quatre Bornes", followers:95000, engagement:9.1, views:14000, price:4500, category:"food" },
+  { id:6, name:"Fitness Island", avatar:"FI", location:"Port Louis", followers:78000, engagement:6.7, views:11000, price:3000, category:"fitness" },
+];
+
+function formatK(n:number){ return n >= 1000 ? (n/1000).toFixed(n%1000?1:0)+'k' : String(n); }
+
+export default function MarketplacePage() {
+  const [tab, setTab] = useState<'grid'|'profile'|'analytics'>('grid');
+  const [query, setQuery] = useState('');
+  const [loc, setLoc] = useState('');
+  const [minEng, setMinEng] = useState('');
+  const [budget, setBudget] = useState('');
+  const [cat, setCat] = useState('');
+  const [sort, setSort] = useState('relevance');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTarget, setModalTarget] = useState<string | null>(null);
+
+  const list = useMemo(() => {
+    let arr = [...CREATORS];
+
+    const q = query.trim().toLowerCase();
+    if (q) arr = arr.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.category.toLowerCase().includes(q) ||
+      c.location.toLowerCase().includes(q)
+    );
+
+    if (loc) arr = arr.filter(c => c.location === loc);
+    if (minEng) arr = arr.filter(c => c.engagement >= parseFloat(minEng));
+
+    if (budget) {
+      if (budget.includes('-')) {
+        const [a,b] = budget.split('-').map(Number);
+        arr = arr.filter(c => c.price >= a && c.price <= b);
+      } else if (budget === '50000+') {
+        arr = arr.filter(c => c.price >= 50000);
+      }
+    }
+
+    if (cat) arr = arr.filter(c => c.category === cat);
+
+    switch (sort) {
+      case 'followers': arr.sort((a,b) => b.followers - a.followers); break;
+      case 'engagement': arr.sort((a,b) => b.engagement - a.engagement); break;
+      case 'price': arr.sort((a,b) => a.price - b.price); break;
+    }
+
+    return arr;
+  }, [query, loc, minEng, budget, cat, sort]);
+
+  return (
+    <div className="mpx">
+      {/* Header */}
+      <header>
+        <div className="container nav">
+          <div className="brand">
+            <div className="logo" />
+            <h1>TikTok Live MU</h1>
+            <span className="pill">Mauritius</span>
+          </div>
+          <div className="nav-cta">
+            <a className="btn" href="/login">Login</a>
+            <a className="btn btn-pri" href="/signup">Join Now</a>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section className="hero">
+        <div className="container hero-inner">
+          <div className="kicker">Creator Marketplace • Preview</div>
+          <div className="h1">Mauritius’ #1 TikTok Creator Marketplace</div>
+          <p className="sub">Book LIVE promos, shoutouts, and collabs. Instant scheduling. Secured payouts. Analytics you can trust.</p>
+          <div className="hero-cta">
+            <a className="btn btn-pri" href="#creators">Find Creators</a>
+            <a className="btn" href="#how">How it works</a>
+          </div>
+          <div className="chiprow">
+            <span className="pill">15–20% commission</span>
+            <span className="pill">Juice • MyT • Card</span>
+            <span className="pill">Gift → MUR tracker</span>
+            <span className="pill">Verified Creators</span>
+          </div>
+
+          <div className="metrics container" style={{paddingTop:18}}>
+            <div className="kpi"><div className="val">500+</div><div className="lab">Active Creators</div></div>
+            <div className="kpi"><div className="val">15M+</div><div className="lab">Total Reach</div></div>
+            <div className="kpi"><div className="val">Rs 2.5M</div><div className="lab">Paid to Creators</div></div>
+            <div className="kpi"><div className="val">96%</div><div className="lab">Success Rate</div></div>
+          </div>
+        </div>
+      </section>
+
+      <main className="container">
+        {/* Tabs */}
+        <div className="tabs" role="tablist" style={{marginTop:22}}>
+          <button className={`tab ${tab==='grid'?'active':''}`} onClick={()=>setTab('grid')}>Find Creators</button>
+          <button className={`tab ${tab==='profile'?'active':''}`} onClick={()=>setTab('profile')}>Creator Profile</button>
+          <button className={`tab ${tab==='analytics'?'active':''}`} onClick={()=>setTab('analytics')}>Analytics</button>
+        </div>
+
+        {/* Filters */}
+        {tab==='grid' && (
+          <>
+            <section className="filters">
+              <div className="filters-top">
+                <div className="search">
+                  <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search creators by name or keyword…" />
+                </div>
+                <button className="btn" onClick={()=>{
+                  setQuery(''); setLoc(''); setMinEng(''); setBudget(''); setCat(''); setSort('relevance');
+                }}>Clear Filters</button>
+              </div>
+              <div className="filter-row">
+                <select value={loc} onChange={e=>setLoc(e.target.value)}>
+                  <option value="">All Locations</option>
+                  <option>Port Louis</option><option>Curepipe</option><option>Flic-en-Flac</option><option>Grand Baie</option><option>Quatre Bornes</option>
+                </select>
+                <select value={minEng} onChange={e=>setMinEng(e.target.value)}>
+                  <option value="">Min Engagement</option>
+                  <option value="1">1%+</option><option value="3">3%+</option><option value="5">5%+</option><option value="8">8%+</option>
+                </select>
+                <select value={budget} onChange={e=>setBudget(e.target.value)}>
+                  <option value="">Budget (Rs)</option>
+                  <option value="0-5000">0–5,000</option><option value="5000-15000">5,000–15,000</option><option value="15000-50000">15,000–50,000</option><option value="50000+">50,000+</option>
+                </select>
+                <select value={cat} onChange={e=>setCat(e.target.value)}>
+                  <option value="">Category</option>
+                  <option value="lifestyle">Lifestyle</option><option value="fashion">Fashion</option><option value="food">Food & Travel</option><option value="tech">Tech</option><option value="fitness">Fitness</option>
+                </select>
+                <select value={sort} onChange={e=>setSort(e.target.value)}>
+                  <option value="relevance">Sort: Relevance</option>
+                  <option value="followers">Followers ↓</option>
+                  <option value="engagement">Engagement ↓</option>
+                  <option value="price">Price ↑</option>
+                </select>
+              </div>
+            </section>
+
+            {/* Grid */}
+            <section id="creators" className="grid" aria-live="polite">
+              {list.map(c=>(
+                <article key={c.id} className="card">
+                  <div className="hdr">
+                    {c.badges && (
+                      <div className="badgewrap">
+                        {c.badges.map(b=><span className="badge" key={b}>{b}</span>)}
+                      </div>
+                    )}
+                    <div className="av">{c.avatar}</div>
+                  </div>
+                  <div className="body">
+                    <div className="nm">{c.name}</div>
+                    <div className="loc">📍 {c.location}</div>
+                    <div className="stats">
+                      <div className="stat"><div className="v">{formatK(c.followers)}</div><div>Followers</div></div>
+                      <div className="stat"><div className="v">{c.engagement}%</div><div>Engagement</div></div>
+                      <div className="stat"><div className="v">{formatK(c.views)}</div><div>Avg Views</div></div>
+                    </div>
+                    <span className="price">From Rs {c.price.toLocaleString()}</span>
+                    <div className="actions">
+                      <button className="ghost" onClick={()=>{ setModalTarget(c.name); setModalOpen(true); }}>Message</button>
+                      <button className="solid" onClick={()=>{ setModalTarget(c.name); setModalOpen(true); }}>Book</button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </section>
+          </>
+        )}
+
+        {/* Profile preview */}
+        {tab==='profile' && (
+          <section className="profile">
+            <aside className="pf-side">
+              <div className="pill" style={{marginBottom:8}}>Verified Creator</div>
+              <h3 style={{margin:'6px 0 2px'}}>Maya Lifestyle</h3>
+              <div style={{color:'#64748b', marginBottom:10}}>Port Louis • Fashion & Lifestyle</div>
+              <div className="tier"><div><strong>Live (15 min)</strong><br/><small>Shoutout + Pin</small></div><div>Rs 5,000</div></div>
+              <div className="tier"><div><strong>Review (1 video)</strong><br/><small>30–60s scripted</small></div><div>Rs 8,000</div></div>
+              <div className="tier"><div><strong>Collab Pack</strong><br/><small>Live + 2 Stories</small></div><div>Rs 12,000</div></div>
+              <button className="solid" style={{marginTop:8,width:'100%'}} onClick={()=>{ setModalTarget('Maya Lifestyle'); setModalOpen(true); }}>Book Creator</button>
+            </aside>
+            <section className="pf-main">
+              <h3>Highlights</h3>
+              <p style={{color:'#334155'}}>Top videos, case studies, and audience breakdown would display here. Add reviews, response time, and availability calendar.</p>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:10,marginTop:8}}>
+                <div className="panel">Video Slot</div>
+                <div className="panel">Video Slot</div>
+                <div className="panel">Audience • 18–24 • MU</div>
+              </div>
+            </section>
+          </section>
+        )}
+
+        {/* Analytics preview */}
+        {tab==='analytics' && (
+          <section className="analytics">
+            <div className="kpi2">
+              <div className="panel"><div style={{fontWeight:900,fontSize:'1.6rem'}}>+12%</div><div className="lab">Avg. Reach vs last month</div></div>
+              <div className="panel"><div style={{fontWeight:900,fontSize:'1.6rem'}}>5.6%</div><div className="lab">Avg. Engagement</div></div>
+              <div className="panel"><div style={{fontWeight:900,fontSize:'1.6rem'}}>Rs 75k</div><div className="lab">Campaign Spend</div></div>
+            </div>
+            <div className="panel" style={{marginTop:12,height:180,display:'grid',placeItems:'center',color:'#64748b'}}>Charts Placeholder</div>
+          </section>
+        )}
+      </main>
+
+      {/* Modal */}
+      {modalOpen && (
+        <div className="mpx" style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,.45)',
+          zIndex:40, display:'flex', alignItems:'center', justifyContent:'center'
+        }} onClick={()=>setModalOpen(false)}>
+          <div style={{background:'#fff',border:'1px solid #e2e8f0',width:'min(620px,92vw)',borderRadius:16,padding:16}}
+               onClick={(e)=>e.stopPropagation()}>
+            <button className="btn" style={{float:'right'}} onClick={()=>setModalOpen(false)}>Close</button>
+            <h3 style={{margin:'0 0 8px'}}>Book {modalTarget || 'Creator'}</h3>
+            <div className="pill" style={{marginBottom:8}}>Escrow Protected</div>
+            <div style={{display:'grid',gap:10}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <select><option>Service • Live 15 min</option><option>Shoutout</option><option>Collab Pack</option></select>
+                <input type="date"/>
+              </div>
+              <textarea rows={4} placeholder="Campaign details…"></textarea>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <input type="number" placeholder="Budget (Rs)" />
+                <select><option>Card</option><option>Juice</option><option>MyT</option></select>
+              </div>
+              <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+                <button className="btn" onClick={()=>setModalOpen(false)}>Cancel</button>
+                <button className="btn btn-pri" onClick={()=>setModalOpen(false)}>Send Request</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+

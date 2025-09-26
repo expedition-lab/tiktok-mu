@@ -1,5 +1,1 @@
 @import "tailwindcss";
-
-/* (optional) your own base tweaks */
-:root { color-scheme: dark; }
-body { min-height: 100vh; }
