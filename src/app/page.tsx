@@ -275,13 +275,7 @@ function TopBar({ canGoBack, onBack }: { canGoBack?: boolean; onBack: () => void
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* TikTok auth buttons */}
-          <a
-            href="/api/auth/tiktok/start"
-            className="rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90"
-          >
-            Continue with TikTok
-          </a>
+         
           <a
             href="/api/auth/logout"
             className="rounded-md px-3 py-2 text-sm hover:bg-white/10"
