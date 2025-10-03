@@ -1,17 +1,29 @@
 import Head from "next/head";
 import Script from "next/script";
 import React, { useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+
+type Product = {
+  id: string;
+  title: string;
+  cat: string;
+  priceMUR: number;
+  seller?: string;
+  img: string;
+};
+
+type CartItem = Product & { qty: number };
+
+type PayPalSDK = {
+  Buttons: (opts: {
+    createOrder: (data: unknown, actions: { order: { create: (input: unknown) => Promise<string> | string } }) => Promise<string> | string;
+    onApprove: (data: { orderID: string }, actions: { order: { capture: () => Promise<unknown> } }) => Promise<void> | void;
+  }) => { render: (selector: string) => void };
+};
 
 export default function Marketplace() {
   useEffect(() => {
-    // ===== Your original inline JS, moved into useEffect =====
-
-    // Tailwind runtime config (same as your <script> block)
-    // @ts-ignore
-    if (typeof window !== "undefined" && (window as any).tailwind) {
-      // nothing to do; CDN script handles it
-    }
-
     const MUR_TO_USD = 0.022;
     const BUYER_FEE_RATE = 0.02;
     const MIN_BUYER_FEE_MUR = 20;
@@ -23,18 +35,16 @@ export default function Marketplace() {
     const q = document.getElementById("q") as HTMLInputElement | null;
     const cat = document.getElementById("cat") as HTMLSelectElement | null;
 
-    const cart: Array<any> = [];
+    const cart: CartItem[] = [];
     const cartCount = document.getElementById("cart-count");
     const cartDrawer = document.getElementById("cart-drawer");
-    const cartBackdrop = document.getElementById("cart-backdrop");
     const cartClose = document.getElementById("cart-close");
-    const cartBtn = document.getElementById("btn-cart");
     const cartItems = document.getElementById("cart-items");
     const cartSubtotal = document.getElementById("cart-subtotal");
 
-    let products: Array<any> = [];
+    let products: Product[] = [];
 
-    function productMatches(p: any) {
+    function productMatches(p: Product) {
       const qq = (q?.value || "").toLowerCase();
       if (qq && !p.title.toLowerCase().includes(qq)) return false;
       if (cat?.value && p.cat !== cat.value) return false;
@@ -67,13 +77,13 @@ export default function Marketplace() {
     async function loadProducts() {
       try {
         const res = await fetch("/api/products");
-        if (!res.ok) throw 0;
-        const { products: rows } = await res.json();
-        products = (rows || []).map((r: any) => ({
+        if (!res.ok) throw new Error("bad");
+        const { products: rows } = (await res.json()) as { products: any[] };
+        products = (rows || []).map((r) => ({
           id: r.id,
           title: r.title,
           cat: r.cat,
-          priceMUR: Number(r.price_mur || r.priceMUR || 0),
+          priceMUR: Number(r.price_mur ?? r.priceMUR ?? 0),
           seller: r.seller_name || "Creator",
           img: r.image_url || r.img,
         }));
@@ -126,44 +136,43 @@ export default function Marketplace() {
     }
 
     // expose handlers for inline onclick strings we inject
-    (window as any).addToCart = (id: string) => {
-      const p = products.find((x: any) => x.id === id);
+    (window as unknown as { addToCart: (id: string) => void }).addToCart = (id: string) => {
+      const p = products.find((x) => x.id === id);
       if (!p) return;
-      const existing = cart.find((x: any) => x.id === id);
+      const existing = cart.find((x) => x.id === id);
       if (existing) existing.qty += 1;
       else cart.push({ ...p, qty: 1 });
       updateCart(); openCart();
     };
-    (window as any).removeFromCart = (id: string) => {
-      const i = cart.findIndex((x: any) => x.id === id);
+    (window as unknown as { removeFromCart: (id: string) => void }).removeFromCart = (id: string) => {
+      const i = cart.findIndex((x) => x.id === id);
       if (i > -1) cart.splice(i, 1);
       updateCart();
     };
-    (window as any).changeQty = (id: string, delta: number) => {
-      const item = cart.find((x: any) => x.id === id);
+    (window as unknown as { changeQty: (id: string, delta: number) => void }).changeQty = (id: string, delta: number) => {
+      const item = cart.find((x) => x.id === id);
       if (!item) return;
       item.qty = Math.max(1, item.qty + delta);
       updateCart();
     };
 
     function renderPayPal(amountMUR: number) {
-      // @ts-ignore
-      const paypal = (window as any).paypal;
+      const paypal = (window as any).paypal as PayPalSDK | undefined;
       const usd = Math.max(1, Math.round(amountMUR * MUR_TO_USD));
       const el = document.getElementById("paypal-container");
       if (!el || typeof paypal === "undefined") return;
       el.innerHTML = "";
       paypal
         .Buttons({
-          createOrder: (_data: any, actions: any) =>
+          createOrder: (_data, actions) =>
             actions.order.create({ purchase_units: [{ amount: { value: String(usd) } }] }),
-          onApprove: async (data: any, actions: any) => {
+          onApprove: async (data, actions) => {
             try {
               await actions.order.capture();
-              const subtotalMur = cart.reduce((n: number, i: any) => n + i.priceMUR * i.qty, 0);
+              const subtotalMur = cart.reduce((n, i) => n + i.priceMUR * i.qty, 0);
               const buyer_fee = computeBuyerFee(subtotalMur);
               const payload = {
-                items: cart.map((i: any) => ({ product_id: i.id, qty: i.qty, price_mur: i.priceMUR })),
+                items: cart.map((i) => ({ product_id: i.id, qty: i.qty, price_mur: i.priceMUR })),
                 payment_method: "paypal",
                 external_ref: data.orderID,
                 status: "paid",
@@ -174,9 +183,9 @@ export default function Marketplace() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
               });
-              const j = await r.json();
-              if (!r.ok) throw new Error(j.error || "Order create failed");
-              alert("Payment successful via PayPal. Order " + (j.id || data.orderID) + " created.");
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error((j as { error?: string }).error || "Order create failed");
+              alert("Payment successful via PayPal. Order " + ((j as any).id || data.orderID) + " created.");
               cart.splice(0, cart.length);
               updateCart();
               closeCart();
@@ -184,7 +193,6 @@ export default function Marketplace() {
               console.error("PayPal onApprove failed", err);
               alert(
                 "Payment succeeded but we could not save your order automatically. Please contact support with PayPal ID " +
-                  // @ts-ignore
                   (data?.orderID || "") +
                   ". Items remain in your cart."
               );
@@ -221,13 +229,13 @@ export default function Marketplace() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Order create failed");
-        alert("Juice reference submitted. Order " + j.id + " awaiting review.");
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error((j as { error?: string }).error || "Order create failed");
+        alert("Juice reference submitted. Order " + (j as any).id + " awaiting review.");
         cart.splice(0, cart.length);
         updateCart();
         closeCart();
-      } catch (e) {
+      } catch (_e) {
         alert("Could not create order. Please try again.");
       }
     });
@@ -283,7 +291,7 @@ export default function Marketplace() {
       try {
         const res = await fetch("/api/products", { method: "POST", body: form });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error((data as any).error || "Upload failed");
+        if (!res.ok) throw new Error((data as { error?: string }).error || "Upload failed");
         sellStatus.textContent = "✅ Product submitted.";
         (e.target as HTMLFormElement).reset();
         sellPreview?.classList.add("hidden");
@@ -304,9 +312,14 @@ export default function Marketplace() {
       console.assert(computeBuyerFee(0) === 0, "fee: 0");
       console.assert(computeBuyerFee(500) === 20, "fee: min");
       console.assert(computeBuyerFee(10000) === 200, "fee: 2%");
-    } catch (e) {
-      console.warn("Self-test fail", e);
+    } catch (err) {
+      console.warn("Self-test fail", err);
     }
+
+    // open/close cart UI wiring
+    document.getElementById("btn-cart")?.addEventListener("click", () => openCart());
+    document.getElementById("cart-close")?.addEventListener("click", () => closeCart());
+    document.getElementById("cart-backdrop")?.addEventListener("click", () => closeCart());
   }, []);
 
   return (
@@ -321,9 +334,9 @@ export default function Marketplace() {
         <meta name="theme-color" content="#ff0050" />
       </Head>
 
-      {/* Tailwind CDN and runtime config */}
-      <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
-      <Script id="tw-config" strategy="beforeInteractive">{`
+      {/* Tailwind CDN (moved to afterInteractive to avoid the warning) */}
+      <Script src="https://cdn.tailwindcss.com" strategy="afterInteractive" />
+      <Script id="tw-config" strategy="afterInteractive">{`
         tailwind.config = {
           theme: { extend: { colors: { brand: { DEFAULT:"#0f172a", pink:"#ff0050", cyan:"#00f2ea", indigo:"#4f46e5" } }, boxShadow: { soft: "0 8px 30px rgba(2,8,23,.08)" } } }
         };
@@ -332,24 +345,23 @@ export default function Marketplace() {
       {/* PayPal SDK */}
       <Script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD" strategy="afterInteractive" />
 
-      {/* === HTML (same structure as your static page) === */}
       <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white text-slate-900">
         {/* Header */}
         <header className="sticky top-0 z-40 bg-slate-900/90 text-white backdrop-blur border-b border-slate-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-            <a href="/" className="flex items-center gap-2 font-semibold">
-              <img src="/logo.png" alt="TokMarket.Live logo" className="w-8 h-8" />
+            <Link href="/" className="flex items-center gap-2 font-semibold">
+              <Image src="/logo.png" alt="TokMarket.Live logo" width={32} height={32} />
               <span>TokMarket.Live</span>
-            </a>
+            </Link>
             <nav className="hidden md:flex items-center gap-6 text-sm">
-              <a href="/#how" className="text-white/80 hover:text-brand-cyan">How it works</a>
-              <a href="/#creators" className="text-white/80 hover:text-brand-cyan">Creators</a>
-              <a href="/marketplace" className="text-white hover:text-brand-cyan font-semibold">Market</a>
-              <a href="/#pricing" className="text-white/80 hover:text-brand-cyan">Pricing</a>
-              <a href="/#faq" className="text-white/80 hover:text-brand-cyan">FAQ</a>
+              <Link href="/#how" className="text-white/80 hover:text-brand-cyan">How it works</Link>
+              <Link href="/#creators" className="text-white/80 hover:text-brand-cyan">Creators</Link>
+              <Link href="/marketplace" className="text-white hover:text-brand-cyan font-semibold">Market</Link>
+              <Link href="/#pricing" className="text-white/80 hover:text-brand-cyan">Pricing</Link>
+              <Link href="/#faq" className="text-white/80 hover:text-brand-cyan">FAQ</Link>
             </nav>
             <div className="flex items-center gap-3">
-              <button id="btn-cart" className="relative inline-flex items-center gap-2 rounded-xl px-3 py-2 border border-white/20 hover:bg-white/10" aria-label="Open cart">
+              <button id="btn-cart" className="relative inline-flex items-center gap-2 rounded-xl px-3 py-2 border border-white/20 hover:bg:white/10" aria-label="Open cart">
                 <span>Cart</span>
                 <span id="cart-count" className="inline-flex items-center justify-center text-xs min-w-5 h-5 rounded-full bg-brand-pink text-white px-1">0</span>
               </button>
@@ -371,7 +383,7 @@ export default function Marketplace() {
             </div>
             <div className="relative">
               <div className="rounded-2xl shadow-[0_8px_30px_rgba(2,8,23,.08)] bg-[rgba(255,255,255,.65)] backdrop-blur p-4">
-                <img src="/hero-live.jpg" alt="Marketplace preview" className="rounded-xl w-full object-cover" loading="lazy" decoding="async"/>
+                <Image src="/hero-live.jpg" alt="Marketplace preview" className="rounded-xl w-full object-cover" width={1024} height={640} />
               </div>
             </div>
           </div>
@@ -452,6 +464,7 @@ export default function Marketplace() {
                     <label className="block text-sm font-medium">Cover image (JPG/PNG, max 2MB)</label>
                     <input id="sell-image" type="file" accept="image/png, image/jpeg" className="mt-1" required />
                     <div className="mt-3">
+                      {/* keep <img> here since we mutate src via JS */}
                       <img id="sell-preview" className="hidden w-full max-h-56 object-cover rounded-xl border" alt="Preview" loading="lazy" decoding="async" />
                     </div>
                   </div>
@@ -505,7 +518,7 @@ export default function Marketplace() {
                       <div className="font-semibold">Pay with Juice</div>
                       <p className="text-xs text-slate-500">Scan & send. Enter ref to confirm.</p>
                     </div>
-                    <img src="/juice-qr.png" alt="Juice QR" className="w-16 h-16 object-contain" loading="lazy" />
+                    <Image src="/juice-qr.png" alt="Juice QR" width={64} height={64} className="object-contain" />
                   </div>
                   <input id="juice-ref" className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="Enter Juice reference" />
                   <button id="juice-paid" className="mt-2 w-full rounded-xl btn-primary px-4 py-2">Mark as paid (Juice)</button>
