@@ -15,59 +15,14 @@ type ApiProduct = {
   seller_name?: string;
 };
 
-type Product = {
-  id: string;
-  title: string;
-  cat: string;
-  priceMUR: number;
-  seller: string;
-  img: string;
-};
-
-type CartItem = Product & { qty: number };
-
-type PayPalCreateOrderActions = {
-  order: {
-    create: (input: {
-      purchase_units: { amount: { value: string } }[];
-    }) => Promise<string>;
-  };
-};
-
-type PayPalOnApproveData = { orderID: string };
-type PayPalOnApproveActions = { order: { capture: () => Promise<void> } };
-
-declare global {
-  interface Window {
-    paypal?: {
-      Buttons: (opts: {
-        createOrder: (
-          data: unknown,
-          actions: PayPalCreateOrderActions
-        ) => Promise<string>;
-        onApprove: (
-          data: PayPalOnApproveData,
-          actions: PayPalOnApproveActions
-        ) => Promise<void>;
-      }) => { render: (selector: string) => void };
-    };
-  }
-}
-
-/** ---------- Fee helpers ---------- */
-const MUR_TO_USD = 0.022; // demo rate
-const BUYER_FEE_RATE = 0.02; // 2%
-const MIN_BUYER_FEE_MUR = 20; // Rs 20 minimum
-const computeBuyerFee = (subtotalMur: number) =>
-  !subtotalMur ? 0 : Math.max(Math.round(subtotalMur * BUYER_FEE_RATE), MIN_BUYER_FEE_MUR);
-
+/** Page component */
 export default function MarketplacePage() {
   useEffect(() => {
     // Footer year
     const yearEl = document.getElementById("year");
     if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
-    // Load PayPal after interactive
+    // Load PayPal after interactive (no beforeInteractive)
     const script = document.createElement("script");
     script.src = "https://www.paypal.com/sdk/js?client-id=sb&currency=USD";
     script.async = true;
@@ -105,6 +60,7 @@ export default function MarketplacePage() {
           )
           .join("");
       } catch {
+        // Demo placeholders if API not wired yet
         empty.classList.add("hidden");
         grid.innerHTML = `
           <article class="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -257,7 +213,7 @@ export default function MarketplacePage() {
           </div>
         </section>
 
-        {/* Sell panel (UI only here; POST handled by /api/products server) */}
+        {/* Sell panel (UI only; POST handled by /api/products on your server) */}
         <section id="sell" className="py-10 bg-slate-50 border-y border-slate-200">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
             <div className="rounded-2xl bg-white border border-slate-200 p-5">
