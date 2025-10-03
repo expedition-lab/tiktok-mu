@@ -1,3 +1,6 @@
+// src/app/page.tsx
+import type { Metadata } from "next";
+
 import HeaderNav from "../components/HeaderNav";
 import Footer from "../components/Footer";
 import HowItWorks from "../components/HowItWorks";
@@ -7,13 +10,13 @@ import Categories from "../components/Categories";
 import Pricing from "../components/Pricing";
 import FAQ from "../components/FAQ";
 
-
-const site = process.env.NEXT_PUBLIC_SITE_URL || "https://tokmarket.live";
+const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tokmarket.live") as string;
 
 export const metadata: Metadata = {
   metadataBase: new URL(site),
   title: "Book TikTok Live shoutouts in minutes — TokMarket.Live",
-  description: "Find Mauritian creators, set your budget, pay safely (JUICE / PayPal), and go LIVE the same day.",
+  description:
+    "Find Mauritian creators, set your budget, pay safely (JUICE / PayPal), and go LIVE the same day.",
   alternates: { canonical: site },
   openGraph: {
     title: "TokMarket.Live — TikTok Live Marketplace",
@@ -41,10 +44,16 @@ export default function HomePage() {
             Find Mauritian creators, set your budget, pay safely, and go LIVE the same day.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
-            <a href="/creators" className="px-5 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-medium">
+            <a
+              href="/creators"
+              className="px-5 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-medium"
+            >
               Browse creators
             </a>
-            <a href="/marketplace" className="px-5 py-3 rounded-xl bg-white/10 text-white ring-1 ring-white/15">
+            <a
+              href="/marketplace"
+              className="px-5 py-3 rounded-xl bg-white/10 text-white ring-1 ring-white/15"
+            >
               Become a seller
             </a>
           </div>
