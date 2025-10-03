@@ -1,12 +1,12 @@
-import type { Metadata } from "next";
-import HeaderNav from "@/components/HeaderNav";
-import Footer from "@/components/Footer";
-import HowItWorks from "@/components/HowItWorks";
-import TrustRow from "@/components/TrustRow";
-import FeaturedCreators from "@/components/FeaturedCreators";
-import Categories from "@/components/Categories";
-import Pricing from "@/components/Pricing";
-import FAQ from "@/components/FAQ";
+import HeaderNav from "../components/HeaderNav";
+import Footer from "../components/Footer";
+import HowItWorks from "../components/HowItWorks";
+import TrustRow from "../components/TrustRow";
+import FeaturedCreators from "../components/FeaturedCreators";
+import Categories from "../components/Categories";
+import Pricing from "../components/Pricing";
+import FAQ from "../components/FAQ";
+
 
 const site = process.env.NEXT_PUBLIC_SITE_URL || "https://tokmarket.live";
 
