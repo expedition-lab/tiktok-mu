@@ -21,20 +21,34 @@ export default function MarketplaceClient() {
     const y = document.getElementById('year');
     if (y) y.textContent = String(new Date().getFullYear());
 
-    // Load PayPal SDK (no beforeInteractive in App Router)
+    // Smooth scroll for in-page anchors (avoid full navigation)
+    const anchorClick = (e: Event) => {
+      const a = e.currentTarget as HTMLAnchorElement;
+      const href = a.getAttribute('href') || '';
+      if (href.startsWith('#')) {
+        e.preventDefault();
+        const id = href.slice(1);
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+    const anchorSelector = 'a[href^="#"]';
+    const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>(anchorSelector));
+    anchors.forEach((a) => a.addEventListener('click', anchorClick));
+
+    // Load PayPal SDK at runtime (no beforeInteractive in App Router)
     const s = document.createElement('script');
     s.src = 'https://www.paypal.com/sdk/js?client-id=sb&currency=USD';
     s.async = true;
     document.body.appendChild(s);
 
-    // Load products
+    // Load products (API or fallback)
     (async () => {
       const grid = document.getElementById('market-grid');
       const empty = document.getElementById('empty');
       if (!grid || !empty) return;
 
       try {
-        const r = await fetch('/api/products');
+        const r = await fetch('/api/products', { method: 'GET', cache: 'no-store' });
         if (!r.ok) throw new Error('No API');
         const { products } = (await r.json()) as { products: ApiProduct[] };
         if (!products?.length) throw new Error('Empty');
@@ -59,9 +73,11 @@ export default function MarketplaceClient() {
           )
           .join('');
       } catch {
-        // Demo fallback
+        // Demo fallback (no navigation)
         empty.classList.add('hidden');
-        grid.innerHTML = `
+        const grid = document.getElementById('market-grid');
+        if (grid)
+          grid.innerHTML = `
           <article class="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <img src="/products/serum.jpg" class="w-full h-44 object-cover" alt="Glow Serum"/>
             <div class="p-4"><h3 class="font-semibold">Glow Serum 30ml</h3><p>Rs 1200</p></div>
@@ -77,9 +93,101 @@ export default function MarketplaceClient() {
       }
     })();
 
+    // SELL form: intercept submit to avoid navigation
+    const sellForm = document.getElementById('sell-form') as HTMLFormElement | null;
+    const sellStatus = document.getElementById('sell-status');
+    const sellImage = document.getElementById('sell-image') as HTMLInputElement | null;
+
+    const onImageChange = () => {
+      if (!sellImage) return;
+      const file = sellImage.files?.[0];
+      if (!file) return;
+      if (!/^image\/(png|jpe?g)$/.test(file.type)) {
+        alert('Only JPG/PNG allowed');
+        sellImage.value = '';
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Max 2MB');
+        sellImage.value = '';
+        return;
+      }
+    };
+
+    const onSubmit = async (e: Event) => {
+      e.preventDefault(); // <— stop full page navigation
+
+      const title = (document.getElementById('sell-title') as HTMLInputElement)?.value.trim();
+      const category = (document.getElementById('sell-cat') as HTMLSelectElement)?.value;
+      const price = parseInt((document.getElementById('sell-price') as HTMLInputElement)?.value || '0', 10);
+      const stock = parseInt((document.getElementById('sell-stock') as HTMLInputElement)?.value || '0', 10);
+      const desc = (document.getElementById('sell-desc') as HTMLTextAreaElement)?.value.trim();
+      const file = sellImage?.files?.[0];
+
+      if (!title || !category || !price || !stock || !file) {
+        if (sellStatus) sellStatus.textContent = 'Please complete all required fields.';
+        return;
+      }
+
+      const form = new FormData();
+      form.append('title', title);
+      form.append('cat', category);
+      form.append('priceMUR', String(price));
+      form.append('stock', String(stock));
+      form.append('description', desc);
+      form.append('image', file);
+
+      try {
+        // If your API is ready, keep this:
+        const res = await fetch('/api/products', { method: 'POST', body: form });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data as { error?: string }).error || 'Upload failed');
+
+        if (sellStatus) sellStatus.textContent = '✅ Product submitted.';
+        (sellForm as HTMLFormElement)?.reset();
+        // Refresh grid (no navigation)
+        const r = await fetch('/api/products', { cache: 'no-store' });
+        if (r.ok) {
+          const { products } = (await r.json()) as { products: ApiProduct[] };
+          const grid = document.getElementById('market-grid');
+          const empty = document.getElementById('empty');
+          if (grid && empty) {
+            empty.classList.toggle('hidden', !!products?.length);
+            grid.innerHTML = (products || [])
+              .map(
+                (p) => `
+                <article class="rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition">
+                  <img src="${p.image_url || p.img || '/products/serum.jpg'}" alt="${p.title}" class="w-full h-44 object-cover"/>
+                  <div class="p-4">
+                    <div class="flex items-center justify-between">
+                      <h3 class="font-semibold">${p.title}</h3>
+                      <span class="text-xs rounded-full bg-cyan-500/10 text-indigo-600 px-2 py-1">${p.cat || ''}</span>
+                    </div>
+                    <p class="text-slate-600 text-sm">Seller: ${p.seller_name || 'Creator'}</p>
+                    <p class="text-slate-900 font-medium mt-1">Rs ${Number(
+                      p.price_mur ?? p.priceMUR ?? 0
+                    ).toLocaleString()}</p>
+                  </div>
+                </article>`
+              )
+              .join('');
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        if (sellStatus) sellStatus.textContent = '❌ Failed to submit. Please try again.';
+      }
+    };
+
+    sellImage?.addEventListener('change', onImageChange);
+    sellForm?.addEventListener('submit', onSubmit);
+
     return () => {
-      // cleanup PayPal script if we navigate away
+      // cleanup
       document.body.removeChild(s);
+      anchors.forEach((a) => a.removeEventListener('click', anchorClick));
+      sellImage?.removeEventListener('change', onImageChange);
+      sellForm?.removeEventListener('submit', onSubmit);
     };
   }, []);
 
@@ -102,6 +210,7 @@ export default function MarketplaceClient() {
           <div className="flex items-center gap-3">
             <button
               id="btn-cart"
+              type="button" /* prevent implicit form submit */
               className="relative inline-flex items-center gap-2 rounded-xl px-3 py-2 border border-white/20 hover:bg-white/10"
               aria-label="Open cart"
             >
@@ -121,8 +230,12 @@ export default function MarketplaceClient() {
               Shop creator-promoted products. Secure checkout via PayPal or Juice.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <a href="#sell" className="rounded-xl text-white px-5 py-3" style={{ background: 'linear-gradient(90deg,#ff0050,#00f2ea)' }}>Sell a product</a>
-              <a href="#grid" className="rounded-xl border border-white/20 px-5 py-3 hover:bg-white/10 text-white">Browse products</a>
+              <a href="#sell" className="rounded-xl text-white px-5 py-3" style={{ background: 'linear-gradient(90deg,#ff0050,#00f2ea)' }}>
+                Sell a product
+              </a>
+              <a href="#grid" className="rounded-xl border border-white/20 px-5 py-3 hover:bg-white/10 text-white">
+                Browse products
+              </a>
             </div>
             <p className="mt-3 text-xs text-slate-500">🔒 Escrow payouts • 💳 Juice & PayPal • 🛡️ Dispute support</p>
           </div>
@@ -165,7 +278,7 @@ export default function MarketplaceClient() {
         </div>
       </section>
 
-      {/* Sell form (client-side only; relies on /api/products) */}
+      {/* Sell form */}
       <section id="sell" className="py-10 bg-slate-50 border-y border-slate-200">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="rounded-2xl bg-white border border-slate-200 p-5">
@@ -186,7 +299,7 @@ export default function MarketplaceClient() {
               <input id="sell-image" type="file" accept="image/png, image/jpeg" />
               <textarea id="sell-desc" rows={3} className="w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="Short details…" />
               <div className="flex gap-3 items-center">
-                <button className="rounded-xl text-white px-5 py-2" style={{ background: 'linear-gradient(90deg,#ff0050,#00f2ea)' }} type="submit">
+                <button type="submit" className="rounded-xl text-white px-5 py-2" style={{ background: 'linear-gradient(90deg,#ff0050,#00f2ea)' }}>
                   Submit product
                 </button>
                 <div id="sell-status" className="text-sm text-slate-600"></div>
