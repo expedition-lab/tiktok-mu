@@ -184,7 +184,7 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen w-full bg-[#0e0f12] text-white">
-      <TopBar
+
         canGoBack={route.name !== "home"}
         onBack={() => setRoute({ name: "home", id: "" })}
       />
