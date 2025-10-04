@@ -75,7 +75,7 @@ const CREATORS: Creator[] = [
     niche: ["Food", "Lifestyle"],
     city: "Curepipe",
     thumb: "https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?q=80&w=1200&auto=format&fit=crop",
-    sampleVideo: "https://www.youtube.com/embed/aqz-KE-bpKQ?si=demo2",
+    sampleVideo: "https://www.youtube.com/embed/aqz-KE-bpKQ?si=2",
     packages: [
       { id: "p1", title: "Restaurant LIVE promo (20 min)", price: 5200 },
       { id: "p2", title: "Menu tasting + LIVE", price: 7800 },
@@ -158,7 +158,7 @@ export default function MarketplacePage() {
   useEffect(() => {
     if (paymentFlow === "myt" && booking) {
       const id = `${booking.creator.id}-${booking.pkg.id}-${Date.now()}`;
-      setExternalLink(`https://pay.myt.mu/demo/${id}`);
+      setExternalLink(`https://pay.myt.mu/${id}`);
     }
   }, [paymentFlow, booking]);
 
@@ -231,7 +231,7 @@ export default function MarketplacePage() {
           onClick={() => setRoute({ name: "dashboard", id: "" })}
           className="inline-flex items-center rounded-md bg-[#25F4EE] px-3 py-2 text-sm font-medium text-black shadow-lg hover:bg-[#25F4EE]/90"
         >
-          <Sparkles className="mr-2 h-4 w-4" /> Brand Dashboard (Demo)
+          <Sparkles className="mr-2 h-4 w-4" /> Brand Dashboard 
         </button>
       </div>
 
