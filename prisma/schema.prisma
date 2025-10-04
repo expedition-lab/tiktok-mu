@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tiktokOpenId   String   @unique
+  tiktokUsername String?
+  avatarUrl      String?
+
+  isSeller  Boolean @default(false)
+  seller    Seller? @relation(fields: [sellerId], references: [id])
+  sellerId  String?
+
+  orders    Order[]
+}
+
+model Seller {
+  id           String    @id @default(cuid())
+  shopName     String
+  bio          String?
+  liveLink     String?
+  paymentLink  String?
+  products     Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  seller      Seller   @relation(fields: [sellerId], references: [id])
+  sellerId    String
+  title       String
+  description String
+  priceMUR    Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Order {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     String?
+  product    Product  @relation(fields: [productId], references: [id])
+  productId  String
+  amountMUR  Int
+  status     String   // pending | paid | canceled
+  email      String?
+  phone      String?
+}
