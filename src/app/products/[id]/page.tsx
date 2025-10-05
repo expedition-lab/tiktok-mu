@@ -25,7 +25,7 @@ const DEMO_PRODUCT: Product = {
 };
 
 export default function ProductDetailPage() {
-  const params = useParams();
+  const _params = useParams();
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
