@@ -12,7 +12,7 @@ export default function SellProductPage() {
     price: '',
     category: '',
     stock: '',
-    condition: 'new',
+    condition: 'new' as 'new' | 'used' | 'refurbished',
     deliveryOptions: [] as string[],
     sellerName: '',
     sellerTikTok: '',
@@ -172,7 +172,7 @@ export default function SellProductPage() {
                 </label>
                 <select
                   value={formData.condition}
-                  onChange={(e) => setFormData({...formData, condition: e.target.value as any})}
+                  onChange={(e) => setFormData({...formData, condition: e.target.value as 'new' | 'used' | 'refurbished'})}
                   className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                 >
                   <option value="new">New</option>
@@ -210,7 +210,7 @@ export default function SellProductPage() {
                 Image upload functionality coming soon
               </p>
               <p className="text-sm text-slate-500 mt-2">
-                You'll be able to upload up to 5 images
+                You&apos;ll be able to upload up to 5 images
               </p>
             </div>
           </div>
